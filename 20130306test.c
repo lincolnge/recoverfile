@@ -1,3 +1,4 @@
+//test the first project
 #include<stdlib.h>
 #include<stdio.h>
 #include<string.h>
@@ -191,7 +192,7 @@ int main(int argc,char **argv)
 		fseek(fp, DataArea+0, SEEK_SET);	//DataArea = 1049600 所有的 都用DataArea去写 
 		fread(buf2, 1, 32, fp);
 		ptr2 = *(struct DirEntry *) buf2;
-		printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+/*		printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
 //		printf("DIR_Name %%u: \t%u\n", ptr2.DIR_Name);
 		printf("DIR_Attr \t%x\n", ptr2.DIR_Attr);	//这个为0f，就是long file name； 20是文件； 10是目录 
 		printf("DIR_FstClusHI \t%u\n", ptr2.DIR_FstClusHI);
@@ -199,17 +200,137 @@ int main(int argc,char **argv)
 		printf("DIR_FileSize \t%ld\n", ptr2.DIR_FileSize);	//long
 		
 		printf("\n\n");
-				
+*/				
 	}else{
 		printf("file open error!\n");
 	}
 	fclose(fp);
+/*	
+	if(argc==1||argc==0){
+		errorUsage();
+	}
+	else if((strcmp(argv[1], "-d") == 0)&&strcmp(argv[3], "-i") == 0&&argc==4){
+		printf("-i \n");
+		fp = fopen(argv[2], "r");
+		if(fp != NULL){
+			struct BootEntry ptr;
+			fseek(fp, 0, SEEK_SET);
+			fread(buf, sizeof(struct BootEntry), 1, fp);
+			ptr = *(struct BootEntry *) buf;
+			printf("Number of FATs = %u\n", ptr.BPB_NumFATs);
+			printf("Number of bytes per sectoor = %u\n", ptr.BPB_BytsPerSec);
+			printf("Number of sectors per cluster = %u\n", ptr.BPB_SecPerClus);
+			printf("Number of reserved sectors = %u\n", ptr.BPB_RsvdSecCnt);
+				
+		}else{
+			error();
+		}
+		fclose(fp);
+	}
+*/			
+	int FirstCluster = 0;
+	int SearchNameNum = 0;	//SearchNameNum = 0
+	int SearTmp = 0;		//辅助 SearchNameNum 计算 
+	int LastSerNum = 0; 
+	char FileName[100][11];
+	char tmpargv = 0xe5;
+	int MuluNameNum = 0;	//MuluNameNum = 0; 目录里循环次数 
+	char MuluName[11];		//目录的名字 
+//	printf("-l \n\n");
 	
-	printf("---------------------------------------\n");
-	if(argc>4){
+	if(argc==1||argc==3){
+		errorUsage();
+	}
+	else if((strcmp(argv[1], "-d") == 0)&&strcmp(argv[3], "-i") == 0&&argc==4){
+//		printf("-i \n");
+		fp = fopen(argv[2], "r");
+		if(fp != NULL){
+			struct BootEntry ptr;
+			fseek(fp, 0, SEEK_SET);
+			fread(buf, sizeof(struct BootEntry), 1, fp);
+			ptr = *(struct BootEntry *) buf;
+			printf("Number of FATs = %u\n", ptr.BPB_NumFATs);
+			printf("Number of bytes per sectoor = %u\n", ptr.BPB_BytsPerSec);
+			printf("Number of sectors per cluster = %u\n", ptr.BPB_SecPerClus);
+			printf("Number of reserved sectors = %u\n", ptr.BPB_RsvdSecCnt);
+				
+		}else{
+			error();
+		}
+		fclose(fp);
+	}
+	else if((strcmp(argv[1], "-d") == 0)&&argc>=4&&(strcmp(argv[3], "-l") == 0)){
+		fp = fopen("/dev/ram1", "r");
+		if(fp != NULL){
+			for(SearchNameNum = 0; SearchNameNum < 20; SearchNameNum++){
+				
+				fseek(fp, DataArea+SearchNameNum*32, SEEK_SET);	//DataArea = 1049600 所有的 都用DataArea去写 
+				fread(buf2, 1, 32, fp);
+				ptr2 = *(struct DirEntry *) buf2;
+				
+				if(ptr2.DIR_Name[0]==0x00)
+					break;
+			
+				FirstCluster = 0;
+				if(ptr2.DIR_Name[0]!=0xe5 && ptr2.DIR_Name[0]!=0x00){
+					if(ptr2.DIR_Attr==0x10){	//判断是否为目录 
+						printf("%d, ", SearchNameNum+SearTmp+1);
+						ptr2.DIR_Name[8] = '\0';
+						FirstCluster = ptr2.DIR_FstClusLO+ptr2.DIR_FstClusHI*65538;
+						memcpy(MuluName, ptr2.DIR_Name, sizeof(ptr2.DIR_Name));
+						MuluName[11] = '\0';
+						printf("%s/, ", MuluName);
+						printf("%ld, ", ptr2.DIR_FileSize);
+						printf("%d\n", FirstCluster);
+//						printf("ptr2.DIR_FstClusLO \t%u\n", ptr2.DIR_FstClusLO);
+//						printf("DIR_FstClusHI \t%u\n", ptr2.DIR_FstClusHI);
+						
+						//目录是从1048576开始算的，1048576 = 1049600 - 2*512 =  DataArea - 2 * ptr.BPB_BytsPerSec 
+						//目录下文件输出----- 1048576（10）=100000（16） 
+						directoryArea = DataArea-2*(ptr.BPB_BytsPerSec); 
+						for(MuluNameNum = 0; MuluNameNum < 10; MuluNameNum++){
+							fseek(fp, directoryArea+FirstCluster*512+MuluNameNum*32, SEEK_SET);	
+							//20是从上面的 DIR_FstClusLO与 DIR_FstClusHI的和得到的，512是一个蔟大小， 64是因为文件目录要再加64 
+							fread(buf2, 1, 32, fp);
+							ptr2 = *(struct DirEntry *) buf2;
+							if(ptr2.DIR_Name[0]!=0x00){
+								if(ptr2.DIR_Attr==0x10){
+									ptr2.DIR_Name[8] = '\0';
+								}
+								printf("%d, ", SearchNameNum+1+SearTmp+1);
+								printf("%s/%s, ", MuluName,ptr2.DIR_Name);
+								printf("%ld, ", ptr2.DIR_FileSize);
+								printf("%d\n", FirstCluster);
+								SearTmp++;
+							}
+						}
+					}
+					else{
+//						fseek(fp, DataArea+SearchNameNum*32, SEEK_SET);	//DataArea = 1049600 所有的 都用DataArea去写 
+//						fread(buf2, 1, 32, fp);
+//						ptr2 = *(struct DirEntry *) buf2;
+						printf("%d, ", SearchNameNum+1+SearTmp);
+						FirstCluster = ptr2.DIR_FstClusLO+ptr2.DIR_FstClusHI*65538;
+						printf("%s ", ptr2.DIR_Name);
+						printf("%ld ", ptr2.DIR_FileSize);
+						printf("%d\n", FirstCluster);
+						
+					}
+					
+				}
+			}
+			
+		}else{
+			printf("file open error!\n");
+		}
+		fclose(fp);
+	}
+	//------------------------------------------------------------------------------------------ 
+	
+	else if(argc>4&&(strcmp(argv[1], "-d") == 0)&&(strcmp(argv[3], "-r") == 0)){
 		//-------------------------匹配文件名的（未完成）-------------------------------- 
-/*		printf("argv[4] is %s \n", argv[4]); 
-		printf("argv[4][0] is %c \n", argv[4][0]);
+		printf("argv[4] is %s \n", argv[4]); 
+/*		printf("argv[4][0] is %c \n", argv[4][0]);
 		printf("argv[4][1] is %c \n", argv[4][1]);
 		printf("argv[4][2] is %c \n", argv[4][2]);
 		printf("argv[4][3] is %c \n", argv[4][3]);
@@ -227,18 +348,18 @@ int main(int argc,char **argv)
 		int PositExt = 0;
 		for(argvii = 0; argvii<11; argvii++){
 			if(argv[4][argvii]=='.'){
-				printf("make the position %d \n", argvii+1);
+//				printf("make the position %d \n", argvii+1);
 				ExtenHave = 1;
 				PositExt = argvii;	// PositExt是 argv[4]点的位置 
 			}
 		}
-		printf("make the position %d \n", argvii+1);
-		printf("make the ExtenHave %d \n", ExtenHave);
+//		printf("make the position %d \n", argvii+1);
+//		printf("make the ExtenHave %d \n", ExtenHave);
 		
-		int SearchNameNum = 0;	//SearchNameNum = 0
-		int LastSerNum = 0; 
-		char FileName[100][11];
-		char tmpargv = 0xe5;
+		SearchNameNum = 0;	//SearchNameNum = 0
+		LastSerNum = 0; 
+		FileName[100][11];
+		tmpargv = 0xe5;
 		tmpargv = argv[4][0];
 		
 		char tmpFileName[11];	//扩展名要用 
@@ -254,13 +375,15 @@ int main(int argc,char **argv)
 				fseek(fp, DataArea+SearchNameNum*32, SEEK_SET);	//DataArea = 1049600 所有的 都用DataArea去写 
 				fread(buf2, 1, 32, fp);
 				ptr2 = *(struct DirEntry *) buf2;
-				int FilePosi = 0;
+				int FilePosi = 0;	//确认输入名字与被删除名字一致 
 				if(ptr2.DIR_Name[0]==0xe5){
 					if(!ExtenHave){
+/*						
 						printf("************************\n");
 						printf("The file was removed ");
 						printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
 						printf("%d \n", SearchNameNum);
+*/
 						memcpy(filename, ptr2.DIR_Name, sizeof(ptr2.DIR_Name));
 						filename[11] = '\0';
 						ifile = 0;
@@ -268,16 +391,17 @@ int main(int argc,char **argv)
 							if(filename[ifile]==0x20)
 								filename[ifile] = 0x00;
 						}
+/*
 						printf("file name is %s\n", filename);
 						printf("file name is %c\n", filename[0]);
 						printf("file name is %x\n", filename[6]);
-						
+*/						
 						argv[4][0] = 0xe5;
 						argv[4][11] = '\0';
-						printf("argv[4] is %s\n", argv[4]);
-						printf("argv[4][6] is %x\n", argv[4][6]);
+//						printf("argv[4] is %s\n", argv[4]);
+//						printf("argv[4][6] is %x\n", argv[4][6]);
 						FilePosi = strcmp(filename, argv[4]);
-						printf("FilePosi is %d\n", FilePosi);
+//						printf("FilePosi is %d\n", FilePosi);
 						if(FilePosi==0){
 							LastSerNum = SearchNameNum;
 							printf("LastSerNum is %d\n", LastSerNum);
@@ -285,7 +409,7 @@ int main(int argc,char **argv)
 					}
 					else{
 						printf("************************\n");
-						printf("PositExt is %d\n", PositExt);
+//						printf("PositExt is %d\n", PositExt);
 						memcpy(filename, ptr2.DIR_Name, sizeof(ptr2.DIR_Name));
 						memcpy(tmpArgv, argv[4], sizeof(argv[4]));
 						argv[4][11] = '\0'; 
@@ -293,8 +417,8 @@ int main(int argc,char **argv)
 						tmpArgv[0] = 0xe5;
 						tmpArgv[PositExt] = '\0';
 						filename[PositExt] = '\0';
-						printf("filename is %s\n", filename);
-						printf("tmpArgv is %s\n", tmpArgv);
+//						printf("filename is %s\n", filename);
+//						printf("tmpArgv is %s\n", tmpArgv);
 						
 						filename[11] = '\0';
 						for(ifile = 0; ifile < 11; ifile++){
@@ -318,18 +442,18 @@ int main(int argc,char **argv)
 //					printf("Empty part\n ");
 				}
 				
-				int FirstCluster = 0;
+				FirstCluster = 0;
 				if(ptr2.DIR_Name[0]!=0xe5 && ptr2.DIR_Name[0]!=0x00){
 					if(ptr2.DIR_Attr==0x10){	//判断是否为目录 
 						ptr2.DIR_Name[8] = '\0';
 						FirstCluster = ptr2.DIR_FstClusLO+ptr2.DIR_FstClusHI*65538;
-						printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+//						printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
 //						printf("ptr2.DIR_FstClusLO \t%u\n", ptr2.DIR_FstClusLO);
 //						printf("DIR_FstClusHI \t%u\n", ptr2.DIR_FstClusHI);
-						printf("First Cluster is %d\n", FirstCluster);
-						printf("size is %ld\n", ptr2.DIR_FileSize);
+//						printf("First Cluster is %d\n", FirstCluster);
+//						printf("size is %ld\n", ptr2.DIR_FileSize);
 						
-						printf("%d \n", SearchNameNum);
+//						printf("%d \n", SearchNameNum);
 						
 						//目录是从1048576开始算的，1048576 = 1049600 - 2*512 =  DataArea - 2 * ptr.BPB_BytsPerSec 
 						//目录下文件输出----- 1048576（10）=100000（16） 
@@ -340,10 +464,10 @@ int main(int argc,char **argv)
 						fread(buf2, 1, 32, fp);
 						ptr2 = *(struct DirEntry *) buf2;
 						if(ptr2.DIR_Name[0]!=0x00){
-							printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
-							printf("First Cluster is %d\n", FirstCluster);
-							printf("size is %ld\n", ptr2.DIR_FileSize);
-							printf("\n\n");
+//							printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+//							printf("First Cluster is %d\n", FirstCluster);
+//							printf("size is %ld\n", ptr2.DIR_FileSize);
+//							printf("\n\n");
 						}
 					}
 					else{
@@ -351,24 +475,11 @@ int main(int argc,char **argv)
 //						fread(buf2, 1, 32, fp);
 //						ptr2 = *(struct DirEntry *) buf2;
 						FirstCluster = ptr2.DIR_FstClusLO+ptr2.DIR_FstClusHI*65538;
-						printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
-						printf("First Cluster is %d\n", FirstCluster);
-						printf("size is %ld\n", ptr2.DIR_FileSize);
-						printf("%d \n", SearchNameNum);
-						if(ExtenHave){
-							
-							if(ptr2.DIR_Name[8]==argv[4][PositExt+1]&&ptr2.DIR_Name[9]==argv[4][PositExt+2]&&ptr2.DIR_Name[10]==argv[4][PositExt+3])
-							{
-			//					LastSerNum = SearchNameNum;
-							}
-						}
-						else{
-							//还有很多&& 不想写了 
-							if(ptr2.DIR_Name[1]==argv[4][1]&&ptr2.DIR_Name[2]==argv[4][2]&&ptr2.DIR_Name[3]==argv[4][3]&&ptr2.DIR_Name[4]==argv[4][4])
-							{
-			//					LastSerNum = SearchNameNum;
-							}
-						}
+//						printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+//						printf("First Cluster is %d\n", FirstCluster);
+//						printf("size is %ld\n", ptr2.DIR_FileSize);
+//						printf("%d \n", SearchNameNum);
+						
 					}
 					
 				}
@@ -383,6 +494,7 @@ int main(int argc,char **argv)
 		int recPos = 0;	//从头（1049600这个位置）开始数，32bytes为一个单位，然后第几个，恢复的文件是第几个！ 
 		recPos = LastSerNum;	//这个recPos就是接口，你把要找到的位置input到这里就OK了！ 
 		//--------------------------恢复文件------------------------------------------------------- 
+		
 		if(recPos!=0){
 			fp = fopen("/dev/ram1", "rw+");
 			if(fp != NULL){
@@ -424,7 +536,7 @@ int main(int argc,char **argv)
 				
 				fread(buf2, 1, 32, fp);
 				ptr2 = *(struct DirEntry *) buf2;
-				printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+				printf("The File Name is need recover: \t%s\n", ptr2.DIR_Name);
 				//-------------------
 			
 				//文件恢复： ff（16）=255； ptr2.DIR_FileSize文件大小； DIR_FstClusLO与 DIR_FstClusHI文件起始位置
@@ -432,7 +544,7 @@ int main(int argc,char **argv)
 				fread(buf2, 1, 32, fp);
 				ptr2 = *(struct DirEntry *) buf2;
 				
-				printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
+				printf("Recover and the result of the File Name is \t%s\n", ptr2.DIR_Name);
 				
 				char FATValue[4];
 				int i = 0;
@@ -476,21 +588,11 @@ int main(int argc,char **argv)
 			fclose(fp);
 			printf("---------------------------------------\n");
 			//-------------------------------------------------------------------------------------- 
-			
-			fp = fopen("/dev/ram1", "r");
-			if(fp != NULL){
-				fseek(fp, 1049600+0, 0);
-				
-				fread(buf2, 1, 32, fp);
-				ptr2 = *(struct DirEntry *) buf2;
-				printf("DIR_Name %%s: \t%s\n", ptr2.DIR_Name);
-						
-			}else{
-				printf("file open error!\n");
-			}
-			
-			fclose(fp);
+
 		}
-	} 
+	}
+	else{
+		errorUsage();
+	}
 }	
 #endif
